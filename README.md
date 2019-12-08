@@ -5,4 +5,10 @@
 </p>
 
 Reinforcement Learning implementation of the Pong game by Atari from students of the KTH Royal Institute of Technology
-Authors: Vittorio Maria Enrico Denti, Francesco Staccone
+
+## Authors
+
+| First name | Last Name | Email address   |
+| ---------- | --------- | --------------- |
+| Vittorio Maria Enrico| Denti | denti@kth.se |
+| Francesco | Staccone  | staccone@kth.se |
