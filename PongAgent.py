@@ -12,6 +12,7 @@ class PongAgent(object):
         self.num_actions = 6
         self.epsilon = 0.5
         self.epsilon_decay = 0.98
+        self.episode_buffer = None
         self.experience_buffer = None
         self.model = self.build_deep_rl_model()
 
@@ -32,12 +33,14 @@ class PongAgent(object):
         return None
 
     def choose_next_action(self, cur_state):
-        #Exploration
-        if np.random.rand() <= self.epsilon:
-            return random.randrange(self.num_actions)
-        #Exploitation
-        act_values = self.model.predict(cur_state)
-        return np.argmax(int(act_values[0]))
+        act_values = self.model.predict(cur_state)[0]
+        action = np.argmax(act_values)
+        q_value = np.max(act_values)
+
+        return action, q_value
+
+    def store_in_episode_buffer(self):
+        self
 
     def build_deep_rl_model(self):
 
@@ -47,34 +50,33 @@ class PongAgent(object):
         model.add(keras.layers.Flatten())
         model.add(keras.layers.Dense(units = 40, activation='relu'))
         model.add(keras.layers.Dense(units = 20, activation='relu'))
-        model.add(keras.layers.Dense(units = 1, activation='softmax'))
+        model.add(keras.layers.Dense(units = self.num_actions, activation='softmax'))
 
-        model.compile(optimizer='rmsprop', loss='sparse_categorical_crossentropy')
+        model.compile(optimizer='adam', loss='mse')
 
         return model
 
     def train(self):
-        cur_frame = self.frame_preprocessing(self.env.reset())
-        prev_frame = np.zeros(shape=(80,80))
         episodes = 0
         gamma = 1
 
-        self.build_deep_rl_model()
+        prev_frame = np.zeros(shape=(80,80))
+        cur_frame = self.frame_preprocessing(self.env.reset())
+        cur_state = (cur_frame - prev_frame).reshape((-1, 80, 80, 1))
 
         while(episodes < self.max_episodes):
             self.env.render()
 
             #action = self.env.action_space.sample()  # your agent here (this takes random actions)
-            cur_state = (cur_frame-prev_frame).reshape((-1, 80, 80, 1))
-            action = self.choose_next_action(cur_state)
-            print(action)
+            action, q_value = self.choose_next_action(cur_state)
             observation, reward, done, info = self.env.step(action)
 
             prev_frame = cur_frame
             cur_frame = self.frame_preprocessing(observation)
 
             cur_state = (cur_frame-prev_frame).reshape((-1, 80, 80, 1))
-            target = reward + gamma * np.amax(self.choose_next_action(cur_state))
+            next_action, next_q_value = self.choose_next_action(cur_state)
+            target = reward + gamma * next_q_value
 
             if done: #episode (one game) is terminated
                 cur_frame = self.frame_preprocessing(self.env.reset())
