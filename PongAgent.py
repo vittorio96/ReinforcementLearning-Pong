@@ -1,3 +1,4 @@
+import random
 import gym
 import keras
 import numpy as np
@@ -8,7 +9,11 @@ class PongAgent(object):
     def __init__(self):
         self.env = gym.make("Pong-v0")
         self.max_episodes = 1 #number of episodes (games) to play during training
+        self.num_actions = 6
+        self.epsilon = 0.5
+        self.epsilon_decay = 0.98
         self.experience_buffer = None
+        self.model = self.build_deep_rl_model()
 
     def frame_preprocessing(self, frame_img):
         # Remove redundant pixels from the image (e.g. points and white line) and downsample with a factor of two
@@ -26,10 +31,18 @@ class PongAgent(object):
 
         return None
 
+    def choose_next_action(self, cur_state):
+        #Exploration
+        if np.random.rand() <= self.epsilon:
+            return random.randrange(self.num_actions)
+        #Exploitation
+        act_values = self.model.predict(cur_state)
+        return np.argmax(int(act_values[0]))
+
     def build_deep_rl_model(self):
 
         model = keras.models.Sequential()
-        model.add(keras.layers.convolutional.Conv2D(filters = 2, kernel_size=(2,2), strides=1, padding='same', activation='relu', input_shape=(80, 80, 1)))
+        model.add(keras.layers.convolutional.Conv2D(filters = 2, kernel_size=(2, 2), strides=1, padding='same', activation='relu', input_shape=(80, 80, 1)))
         model.add(keras.layers.convolutional.MaxPooling2D(pool_size=(2,2)))
         model.add(keras.layers.Flatten())
         model.add(keras.layers.Dense(units = 40, activation='relu'))
@@ -42,19 +55,26 @@ class PongAgent(object):
 
     def train(self):
         cur_frame = self.frame_preprocessing(self.env.reset())
-        #prev_frame = np.zeros(shape=(80,80))
+        prev_frame = np.zeros(shape=(80,80))
         episodes = 0
+        gamma = 1
 
-        #model = self.build_deep_rl_model()
+        self.build_deep_rl_model()
 
         while(episodes < self.max_episodes):
             self.env.render()
 
-            action = self.env.action_space.sample()  # your agent here (this takes random actions)
+            #action = self.env.action_space.sample()  # your agent here (this takes random actions)
+            cur_state = (cur_frame-prev_frame).reshape((-1, 80, 80, 1))
+            action = self.choose_next_action(cur_state)
+            print(action)
             observation, reward, done, info = self.env.step(action)
 
             prev_frame = cur_frame
             cur_frame = self.frame_preprocessing(observation)
+
+            cur_state = (cur_frame-prev_frame).reshape((-1, 80, 80, 1))
+            target = reward + gamma * np.amax(self.choose_next_action(cur_state))
 
             if done: #episode (one game) is terminated
                 cur_frame = self.frame_preprocessing(self.env.reset())
