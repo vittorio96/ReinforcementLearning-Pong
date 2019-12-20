@@ -15,6 +15,7 @@ class PongAgent(object):
         self.experience_buffer_size = 800
         self.mini_batch_size = int(self.experience_buffer_size * 0.5)
         self.update_rate = 0.8
+        self.update_rate_decay = 0.98
         self.experience_buffer = []
         self.gamma = 0.8
         self.model = self.build_deep_rl_model()
@@ -42,6 +43,7 @@ class PongAgent(object):
 
     def learn_from_experience(self):
         mini_batch = random.sample(self.experience_buffer, min(self.mini_batch_size, len(self.experience_buffer)))
+        self.update_rate *= self.update_rate_decay
 
         X, y = [], []
 
@@ -66,13 +68,14 @@ class PongAgent(object):
         return action, q_value
 
     def get_random_action(self):
+        self.epsilon *= self.epsilon_decay
         return random.randrange(self.num_actions)
 
     def build_deep_rl_model(self):
 
         model = keras.models.Sequential()
         model.add(keras.layers.convolutional.Conv2D(filters = 2, kernel_size=(2, 2), strides=1, padding='same', activation='relu', input_shape=(80, 80, 1)))
-        #model.add(keras.layers.convolutional.MaxPooling2D(pool_size=(2,2)))
+        model.add(keras.layers.convolutional.MaxPooling2D(pool_size=(2,2)))
         model.add(keras.layers.Flatten())
         model.add(keras.layers.Dense(units = 40, activation='relu'))
         model.add(keras.layers.Dense(units = 20, activation='relu'))
@@ -95,7 +98,10 @@ class PongAgent(object):
         while(episodes < self.max_episodes):
             self.env.render()
 
-            action, q_value = self.choose_next_action(cur_state)
+            if np.random.rand() <= self.epsilon:
+                action =  random.randrange(self.num_actions)
+            else:
+                action, q_value = self.choose_next_action(cur_state)
 
             observation, reward, done, info = self.env.step(action)
 
