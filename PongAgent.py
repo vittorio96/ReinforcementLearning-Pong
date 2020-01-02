@@ -9,17 +9,17 @@ class PongAgent(object):
 
     def __init__(self):
         self.env = gym.make("Pong-v0")
-        self.max_episodes = 15 #number of episodes (games) to play during training
+        self.max_episodes = 1000 #number of episodes (games) to play during training
         self.num_actions = 6
         self.frames_to_merge = 3
-        self.epsilon = 0.9
+        self.epsilon = 0.1
         self.epsilon_decay = 0.97
         self.experience_buffer_size = 6000
         self.mini_batch_size = int(self.experience_buffer_size * 0.25)
-        self.buffer_update_rate = 0.7
+        self.buffer_update_rate = 0.5
         self.buffer_update_rate_decay = 0.96
         self.experience_buffer = []
-        self.gamma = 0.55
+        self.gamma = 0.65
         self.prediction_model = self.build_deep_rl_model()
         self.target_model = self.build_deep_rl_model()
 
@@ -27,7 +27,6 @@ class PongAgent(object):
         # Remove redundant pixels from the image (e.g. points and white line) and downsample with a factor of two
         frame_img = frame_img[35:195]
         frame_img = frame_img[0::2, 0::2, 0] #takes one element every two elements
-
         return frame_img #80x80 numpy array
 
     def update_experience_buffer(self, train_sample):
@@ -55,7 +54,7 @@ class PongAgent(object):
         X = np.array(X)
         y = np.array(y)
         # Train the model on the last examples
-        self.prediction_model.fit(x=X, y=y, epochs=1)
+        #self.prediction_model.fit(x=X, y=y, epochs=1)
         # Decrement the update rate
         if self.buffer_update_rate_decay > 0.1:
             self.buffer_update_rate *= self.buffer_update_rate_decay
@@ -83,12 +82,11 @@ class PongAgent(object):
         model.add(keras.layers.Dense(units = self.num_actions, activation='sigmoid'))
 
         model.compile(optimizer='adam', loss='mse')
-        #model.load_weights("prediction_model_weights_3k.h5")
+        model.load_weights("prediction_model_weights_1k.h5")
         return model
 
     def train(self):
         episodes = 0
-        gamma = 0.6
 
         state = self.frame_preprocessing(self.env.reset())
 
@@ -116,7 +114,7 @@ class PongAgent(object):
                 self.env.render() # render a frame
 
             avg_reward = reward_sum/self.frames_to_merge
-            # Reward normalization
+            # Reward normalization to give a stable reward over time
             if avg_reward < 0:
                 final_reward = -1
             elif avg_reward > 0:
@@ -136,7 +134,7 @@ class PongAgent(object):
                 state = next_state
 
         self.env.close()
-        #self.prediction_model.save_weights("prediction_model_weights_3k.h5")
+        #self.prediction_model.save_weights("prediction_model_weights_1k.h5")
 
 
 # Main function to control the agent
