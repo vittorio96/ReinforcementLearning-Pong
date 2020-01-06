@@ -9,14 +9,14 @@ class PongAgent(object):
 
     def __init__(self):
         self.env = gym.make("Pong-v0")
-        self.max_episodes = 1000 #number of episodes (games) to play during training
+        self.max_episodes = 4000 #number of episodes (games) to play during training
         self.num_actions = 6
         self.frames_to_merge = 3
-        self.epsilon = 0.1
+        self.epsilon = 0.7
         self.epsilon_decay = 0.97
         self.experience_buffer_size = 6000
         self.mini_batch_size = int(self.experience_buffer_size * 0.25)
-        self.buffer_update_rate = 0.5
+        self.buffer_update_rate = 0.8
         self.buffer_update_rate_decay = 0.96
         self.experience_buffer = []
         self.gamma = 0.65
@@ -35,7 +35,7 @@ class PongAgent(object):
             self.experience_buffer.append(train_sample)
         else:
             # Toss a coin to decide whether to add the last example to the experience replay buffer or not
-            if random.random() < self.buffer_update_rate:
+            if (random.random() < self.buffer_update_rate or train_sample[3] > 0):
                 to_del_idx = random.randint(0, self.experience_buffer_size - 1)
                 self.experience_buffer[to_del_idx] = train_sample
 
@@ -54,7 +54,7 @@ class PongAgent(object):
         X = np.array(X)
         y = np.array(y)
         # Train the model on the last examples
-        #self.prediction_model.fit(x=X, y=y, epochs=1)
+        self.prediction_model.fit(x=X, y=y, epochs=1)
         # Decrement the update rate
         if self.buffer_update_rate_decay > 0.1:
             self.buffer_update_rate *= self.buffer_update_rate_decay
@@ -82,7 +82,7 @@ class PongAgent(object):
         model.add(keras.layers.Dense(units = self.num_actions, activation='sigmoid'))
 
         model.compile(optimizer='adam', loss='mse')
-        model.load_weights("prediction_model_weights_1k.h5")
+        #model.load_weights("prediction_model_weights_1k.h5")
         return model
 
     def train(self):
@@ -116,9 +116,9 @@ class PongAgent(object):
             avg_reward = reward_sum/self.frames_to_merge
             # Reward normalization to give a stable reward over time
             if avg_reward < 0:
-                final_reward = -1
+                final_reward = - 1
             elif avg_reward > 0:
-                final_reward = +1
+                final_reward = +100
             else:
                 final_reward = 0
 
