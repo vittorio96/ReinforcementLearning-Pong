@@ -55,8 +55,8 @@ class PongAgent(object):
         y = np.array(y)
         # Train the model on the last examples
         self.prediction_model.fit(x=X, y=y, epochs=1)
-        # Decrement the update rate
-        if self.buffer_update_rate_decay > 0.1:
+        # Decrement the update rate. Update rate is never below 0.25
+        if self.buffer_update_rate_decay > 0.25:
             self.buffer_update_rate *= self.buffer_update_rate_decay
 
     def choose_next_action(self, cur_state):
