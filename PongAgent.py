@@ -2,21 +2,21 @@ import random
 import gym
 import keras
 import numpy as np
-from scipy.misc import toimage
+#from scipy.misc import toimage
 
 #Class that defines the Deep Q learning implementation of the pong game
 class PongAgent(object):
 
     def __init__(self):
         self.env = gym.make("Pong-v0")
-        self.max_episodes = 4000 #number of episodes (games) to play during training
+        self.max_episodes = 100 #number of episodes (games) to play during training
         self.num_actions = 6
         self.frames_to_merge = 3
-        self.epsilon = 0.7
-        self.epsilon_decay = 0.97
-        self.experience_buffer_size = 6000
-        self.mini_batch_size = int(self.experience_buffer_size * 0.25)
-        self.buffer_update_rate = 0.8
+        self.epsilon = 0.8
+        self.epsilon_decay = 0.99
+        self.experience_buffer_size = 2000
+        self.mini_batch_size = int(self.experience_buffer_size * 0.005)
+        self.buffer_update_rate = 0.5
         self.buffer_update_rate_decay = 0.96
         self.experience_buffer = []
         self.gamma = 0.65
@@ -45,7 +45,7 @@ class PongAgent(object):
         X, y = [], []
         # Prepare the training data
         for next_state, state, action, reward in mini_batch:
-            target = reward + self.gamma * np.amax(self.prediction_model.predict(next_state)[0])
+            target = reward + self.gamma * np.amax(self.target_model.predict(next_state)[0])
             target_f = self.prediction_model.predict(state)
             target_f[0][action] = target
             # Add example to train
@@ -54,9 +54,9 @@ class PongAgent(object):
         X = np.array(X)
         y = np.array(y)
         # Train the model on the last examples
-        self.prediction_model.fit(x=X, y=y, epochs=1)
+        self.prediction_model.fit(x=X, y=y, epochs=1, verbose=0)
         # Decrement the update rate. Update rate is never below 0.25
-        if self.buffer_update_rate_decay > 0.25:
+        if self.buffer_update_rate_decay > 0.35:
             self.buffer_update_rate *= self.buffer_update_rate_decay
 
     def choose_next_action(self, cur_state):
@@ -73,13 +73,11 @@ class PongAgent(object):
     def build_deep_rl_model(self):
 
         model = keras.models.Sequential()
-        model.add(keras.layers.convolutional.Conv2D(filters = 16, kernel_size=(8, 8), strides=4, padding='same', activation='relu', input_shape=(80, 80, 1)))
-        model.add(keras.layers.convolutional.Conv2D(filters=32, kernel_size=(4, 4), strides=2, padding='same', activation='relu'))
-        #model.add(keras.layers.convolutional.MaxPooling2D(pool_size=(2,2), strides=1))
+        model.add(keras.layers.convolutional.Conv2D(filters = 8, kernel_size=(8, 8), strides=4, padding='same', activation='relu', input_shape=(80, 80, 1)))
+        model.add(keras.layers.convolutional.Conv2D(filters=16, kernel_size=(4, 4), strides=2, padding='same', activation='relu'))
         model.add(keras.layers.Flatten())
-        model.add(keras.layers.Dense(units = 256, activation='relu'))
         model.add(keras.layers.Dense(units = 128, activation='relu'))
-        model.add(keras.layers.Dense(units = self.num_actions, activation='sigmoid'))
+        model.add(keras.layers.Dense(units = self.num_actions, activation='relu'))
 
         model.compile(optimizer='adam', loss='mse')
         #model.load_weights("prediction_model_weights_1k.h5")
@@ -87,11 +85,14 @@ class PongAgent(object):
 
     def train(self):
         episodes = 0
+        episode_reward_history = []
+        average_reward_history = []
 
         state = self.frame_preprocessing(self.env.reset())
 
         while(episodes < self.max_episodes):
-            self.env.render()#render a frame
+
+            #self.env.render()#render a frame
 
             # Sample an action (exploration vs exploitation)
             if np.random.rand() <= self.epsilon:
@@ -111,31 +112,41 @@ class PongAgent(object):
                 next_state += self.frame_preprocessing(observation)
                 if done:
                     break
-                self.env.render() # render a frame
+                #self.env.render() # render a frame
 
-            avg_reward = reward_sum/self.frames_to_merge
+            avg_frame_reward = reward_sum/self.frames_to_merge
             # Reward normalization to give a stable reward over time
-            if avg_reward < 0:
-                final_reward = - 1
-            elif avg_reward > 0:
-                final_reward = +100
+            if avg_frame_reward < 0:
+                final_reward = -1
+            elif avg_frame_reward > 0:
+                final_reward = +1
             else:
                 final_reward = 0
+
+            episode_reward_history.append(final_reward)
 
             #toimage(next_state).show()
             # Prepare for the next transition in the game
             if done: #episode (one game) is terminated
                 episodes += 1
-                self.learn_from_experience()
+                #Analyze average reward
+                average_reward_history.append(sum(episode_reward_history) / len(episode_reward_history))
+                moving_average = sum(average_reward_history[-min(100, len(average_reward_history)):])/min(100, len(average_reward_history))
+                print("Sliding average reward after episode:"+str(moving_average))
                 state = self.frame_preprocessing(self.env.reset())
+                #Copy parameters from prediction network to target network
+                if episodes % 2 == 0:
+                    self.target_model.set_weights(self.prediction_model.get_weights())
             else:
                 train_sample = (next_state.reshape(-1, 80, 80, 1), state.reshape(-1, 80, 80, 1), action, final_reward)
                 self.update_experience_buffer(train_sample)
+                self.learn_from_experience()
                 state = next_state
 
+        print("Sliding average reward history during training:")
+        print(average_reward_history)
+        self.prediction_model.save_weights("prediction_model_weights_100.h5")
         self.env.close()
-        #self.prediction_model.save_weights("prediction_model_weights_1k.h5")
-
 
 # Main function to control the agent
 agent = PongAgent()
