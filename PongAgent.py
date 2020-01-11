@@ -15,7 +15,7 @@ class PongAgent(object):
         self.epsilon = 0.8
         self.epsilon_decay = 0.99
         self.experience_buffer_size = 2000
-        self.mini_batch_size = int(self.experience_buffer_size * 0.005)
+        self.mini_batch_size = int(self.experience_buffer_size * 0.004)#take 80 samples
         self.buffer_update_rate = 0.5
         self.buffer_update_rate_decay = 0.96
         self.experience_buffer = []
