@@ -9,7 +9,7 @@ class PongAgent(object):
 
     def __init__(self):
         self.env = gym.make("Pong-v0")
-        self.max_episodes = 100 #number of episodes (games) to play during training
+        self.max_episodes = 200 #number of episodes (games) to play during training
         self.num_actions = 2
         self.frames_to_merge = 3
         self.epsilon = 0.95
@@ -129,7 +129,7 @@ class PongAgent(object):
 
         print("Sliding average reward history during training:")
         print(average_reward_history)
-        self.prediction_model.save_weights("prediction_model_weights_300.h5")
+        self.prediction_model.save_weights("prediction_model_weights_200.h5")
         self.env.close()
 
 # Main function to control the agent
