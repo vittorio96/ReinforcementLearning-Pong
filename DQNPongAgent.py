@@ -2,7 +2,6 @@ import random
 import gym
 import keras
 import numpy as np
-#from scipy.misc import toimage
 
 #Class that defines the Deep Q learning implementation of the pong game
 class PongAgent(object):
@@ -28,7 +27,7 @@ class PongAgent(object):
         frame_img[frame_img == 144] = 0
         frame_img[frame_img == 109] = 0
         frame_img[frame_img != 0] = 255
-        return frame_img  # 40x40 numpy array
+        return frame_img/255  # 40x40 numpy array
 
     def update_experience_buffer(self, train_sample):
         # Update the experience buffer
@@ -87,10 +86,11 @@ class PongAgent(object):
         initial_state = self.frame_preprocessing(self.env.reset())
         state = np.stack((initial_state, initial_state, initial_state), axis = 2)
         state = state.reshape(1, 40, 40, 3)
+        goals_done = 0
 
         while episodes < self.max_episodes:
 
-            self.env.render()#render a frame
+            #self.env.render()#render a frame
 
             # Sample an action (exploration vs exploitation)
             if np.random.rand() <= self.epsilon:
@@ -100,13 +100,15 @@ class PongAgent(object):
 
             observation, reward, done, info = self.env.step(action)
 
+            # Prepare the next state by merging consecutive frames
             obs = self.frame_preprocessing(observation)
             obs = obs.reshape(1, 40, 40, 1)
-
             next_state = np.append(obs, state[:,:,:,:self.frames_to_merge-1], axis = 3)
-            episode_reward_history.append(reward)
 
-            #toimage(next_state).show()
+            # Measure learning metrics
+            if reward != 0: episode_reward_history.append(reward)
+            if reward == 1: goals_done += 1
+
             # Prepare for the next transition in the game
             if done: #episode (one game) is terminated
                 episodes += 1
@@ -114,13 +116,16 @@ class PongAgent(object):
                 average_reward_history.append(sum(episode_reward_history) / len(episode_reward_history))
                 moving_average = sum(average_reward_history[-min(12, len(average_reward_history)):])/min(12, len(average_reward_history))
                 print("Sliding average reward after episode:"+str(moving_average))
+                print("Number goals done:" + str(goals_done))
                 #Copy parameters from prediction network to target network
                 if episodes % 4 == 0:
                     self.target_model.set_weights(self.prediction_model.get_weights())
+                    self.prediction_model.save_weights("prediction_model_weights_{}.h5".format(episodes))
                 #Initialize new episode
                 initial_state = self.frame_preprocessing(self.env.reset())
                 state = np.stack((initial_state, initial_state, initial_state), axis = 2)
                 state = state.reshape(1, 40, 40, 3)
+                goals_done = 0
             else:
                 train_sample = (next_state, state, action, reward)
                 self.update_experience_buffer(train_sample)
